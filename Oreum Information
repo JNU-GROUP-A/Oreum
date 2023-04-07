@@ -1,0 +1,184 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.arima.model import ARIMA
+import openpyxl
+import requests
+import json
+
+# API 호출을 위한 인증키
+API_key = "Your API_key"
+
+### DATE ### 
+date = pd.read_excel("Team Project/date(20170701-20201028).xlsx")
+date = date.fillna(0)
+
+def date_year(df,year):
+  d = []
+  Y = list(df[year])
+  for i in range(len(Y)):
+    if Y[i] > 0:      
+      Y[i] = int(Y[i])
+      d.append(Y[i])
+  return d
+  
+DATE = []
+YEAR = [2017,2018,2019,2020]
+for i in range(len(YEAR)):
+  DATE = DATE + date_year(date,YEAR[i])
+DATE[:5]
+
+
+### URL
+# oreum information
+OI_URL = []
+for i in range(40):
+  url = "https://open.jejudatahub.net/api/proxy/1Dttb1tab8tD88Dtat11111at1t1atD8/API_key?number=%d" % (i+1)
+  OI_URL.append(url)
+
+### Oreum Information
+  # oreum information
+OI_URL = []
+for i in range(40):
+  url = "https://open.jejudatahub.net/api/proxy/1Dttb1tab8tD88Dtat11111at1t1atD8/API_key?number=%d" % (i+1)
+  OI_URL.append(url)
+  
+def oreum_information(url):
+    print(url)
+    limit = 100
+    offset = 0
+    D = []
+    while True:
+        querystring = { "limit":limit}
+        response = requests.request("GET", url)# params=querystring)
+        if response.status_code != 200:
+            print("Error:", response.text)
+            break
+
+        data = json.loads(response.text)
+        D.append(data)
+        for item in data:
+            print(item)
+        if len(data) < limit:
+            break
+        offset += limit
+    return D
+  
+  
+def json_to_dataframe_oreum(json_data):
+    placeName = []; category = []; addressJibun = []; longitude = []; latitude = []; placeUrl = []
+    for i in range(len(json_data)):
+        placeName.append(json_data[i]["placeName"])
+        category.append(json_data[i]["category"])
+        addressJibun.append(json_data[i]["addressJibun"])
+        longitude.append(json_data[i]["longitude"])
+        latitude.append(json_data[i]["latitude"])
+        placeUrl.append(json_data[i]["placeUrl"])
+
+    df = pd.DataFrame({"placeName":placeName,
+                       "category":category,
+                       "addressJibun":addressJibun,
+                       "longitude":longitude,
+                       "latitude":latitude,
+                       "placeUrl":placeUrl})
+    df = df.drop_duplicates()
+    return df
+    
+OI = []
+for i in range(len(OI_URL)):
+  # print(i)
+  oi = oreum_information(OI_URL[i])
+  OI.append(oi[0]['data'])
+OI = sum(OI,[]) 
+"""
+{'placeName': '돌오름',
+ 'category': '여행 > 관광,명소 > 오름',
+ 'addressJibun': '제주특별자치도 제주시 월평동 산 6-9',
+ 'longitude': 126.56854715172864,
+ 'latitude': 33.380602529284616,
+ 'placeUrl': 'http://place.map.kakao.com/7833931'}
+ """
+ 
+ OI_df = json_to_dataframe_oreum(OI)
+ OI_df.info()
+ """
+ <class 'pandas.core.frame.DataFrame'>
+Int64Index: 381 entries, 0 to 380
+Data columns (total 6 columns):
+ #   Column        Non-Null Count  Dtype  
+---  ------        --------------  -----  
+ 0   placeName     381 non-null    object 
+ 1   category      381 non-null    object 
+ 2   addressJibun  381 non-null    object 
+ 3   longitude     381 non-null    float64
+ 4   latitude      381 non-null    float64
+ 5   placeUrl      381 non-null    object 
+dtypes: float64(2), object(4)
+memory usage: 20.8+ KB
+"""
+
+OREUM = list(OI_df['placeName'])
+
+### Oreum Course
+OC_URL = []
+for i in range(1,len(DATE)+1):
+  for j in range(1,len(OREUM)+1):
+    for number in range(1,5):
+      try:
+        url = 'https://open.jejudatahub.net/api/proxy/51tt9Daaa6atttDataaa5Dbttattttat/API_key?movingPath=%s&searchDate=%d&number=%d&limit=100' % (OREUM[j],DATE[i],number)
+        # print(i,j,number)
+        OC_URL.append(url)
+      except IndexError: pass
+
+OC_URL_df = pd.DataFrame({'url':OC_URL})
+
+def oreum_course(url):
+    offset = 0
+    D = []
+    while True:
+        response = requests.request("GET", url)# params=querystring)
+        if response.status_code != 200:
+            # print("Error:", response.text)
+            break
+
+        data = json.loads(response.text)
+        D.append(data)
+        for item in data:
+            print(item)
+        if len(data) < 100:
+            break
+        offset += 100
+    return D
+    
+OC_URL = list(OC_URL['url'])
+
+for i in range(967,len(OC_URL)):
+  # print(i)
+  try:
+    oc = oreum_course(OC_URL[i])
+    OC.append(oc[0]['data'])
+  except IndexError: pass
+  
+def json_to_dataframe_population(json_data):
+    baseDate = []; movingPath = []; pathSize = []; movingCount = []
+
+    for i in range(len(json_data)):
+        baseDate.append(json_data[i]["baseDate"])
+        movingPath.append(json_data[i]["movingPath"])
+        pathSize.append(json_data[i]["pathSize"])
+        movingCount.append(json_data[i]["movingCount"])
+
+    df = pd.DataFrame({"baseDate":baseDate,
+                      "movingPath":movingPath,
+                      "pathSize":pathSize,
+                      "movingCount":movingCount})
+    df = df.drop_duplicates()
+    return df
+    
+oc = sum(OC,[])
+'''
+{'baseDate': '20170702',
+ 'movingPath': '협재해변|수월봉',
+ 'pathSize': 2,
+ 'movingCount': 2}
+'''
